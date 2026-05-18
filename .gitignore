@@ -3,3 +3,11 @@
 
 # Ada Library Information
 *.ali
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+build/__pycache__/
