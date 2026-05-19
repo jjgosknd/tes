@@ -2,63 +2,80 @@
 PLANTUML КОД ДИАГРАММ ДЛЯ ДИПЛОМНОЙ РАБОТЫ
 Тема: «Разработка мобильного приложения для прохождения онлайн курсов»
 Приложение: EduFlow (com.eduflow.mobile)
-==============================================================
 
-Как использовать:
-1. Откройте https://www.plantuml.com/plantuml/uml
-2. Вставьте код одной диаграммы (от @startuml до @enduml)
-3. Нажмите "Submit" → скачайте PNG
-4. Вставьте PNG в Word вместо [рисунок]
-
-Всего 9 диаграмм (как в примере друга):
+Структура такая же как в примере (Диплом с третьей главой):
   Глава 2: Рис.1-7 (проектирование)
   Глава 3: Рис.8-9 (экраны приложения)
 
+Инструкция:
+1. Открой https://www.plantuml.com/plantuml/uml
+2. Скопируй код от @start до @end
+3. Нажми Submit → скачай PNG
+4. Вставь в Word
+==============================================================
+
+
 ==============================================================
 Рис. 1. Функциональная схема работы мобильного приложения EduFlow
+(Блок-схема общего алгоритма работы — как у друга рис.1)
 ==============================================================
 
 @startuml
 skinparam backgroundColor white
-skinparam defaultFontName "Times New Roman"
-skinparam defaultFontSize 11
+skinparam ActivityBackgroundColor #DEEBF7
+skinparam ActivityBorderColor #2E75B6
+skinparam DiamondBackgroundColor #FFF2CC
+skinparam DiamondBorderColor #BF9000
 
+|Мобильный клиент|
 start
-:Запуск приложения;
-if (Токен сохранён?) then (да)
-  :Автоматический вход\n(refresh token);
+:Запуск приложения EduFlow;
+if (Сохранён refresh-токен?) then (да)
+  :Отправка POST /api/v1/auth/refresh;
+  if (Токен валиден?) then (да)
+    :Получение нового access-токена;
+  else (нет)
+    :Переход на экран авторизации;
+    :Ввод email и пароля;
+    :POST /api/v1/auth/login;
+    :Сохранение JWT-токенов в\nEncryptedSharedPreferences;
+  endif
 else (нет)
-  :Экран авторизации;
-  :Ввод email и пароля;
-  :POST /api/v1/auth/login;
-  :Сохранение JWT-токенов\nв EncryptedSharedPreferences;
+  :Экран авторизации/регистрации;
+  :POST /api/v1/auth/login или /register;
+  :Сохранение JWT-токенов;
 endif
 
 :Загрузка каталога курсов\nGET /api/v1/categories\nGET /api/v1/courses;
-
 :Отображение списка курсов\nс фильтрацией по категориям;
 
-:Выбор курса пользователем;
+:Пользователь выбирает курс;
 :Загрузка карточки курса\nGET /api/v1/courses/{id};
 
-if (Пользователь записан?) then (нет)
+if (Пользователь записан на курс?) then (нет)
   :Запись на курс\nPOST /api/v1/courses/{id}/enroll;
 else (да)
 endif
 
-:Последовательное прохождение уроков;
-
+|Цикл прохождения уроков|
 repeat
-  :Загрузка урока\nGET /api/v1/lessons/{id};
-  :Просмотр видео и текста;
-  :Прохождение теста\nPOST /api/v1/lessons/{id}/quiz;
-  :Отметка урока пройденным\nPOST /api/v1/lessons/{id}/complete;
-repeat while (Ещё есть уроки?) is (да)
+  :Загрузка содержимого урока\nGET /api/v1/lessons/{id};
+  :Отображение видеоплеера\n(Media3 ExoPlayer) и текста;
+  :Отображение проверочного теста;
+  :Пользователь отвечает на вопросы;
+  :Отправка ответов\nPOST /api/v1/lessons/{id}/quiz;
+  if (Тест пройден >= 70%?) then (да)
+    :Отметка урока пройденным\nPOST /api/v1/lessons/{id}/complete;
+  else (нет)
+    :Сообщение «Попробуйте ещё раз»;
+  endif
+repeat while (Есть непройденные уроки?) is (да)
 ->нет;
 
-:Генерация сертификата\nна стороне сервера;
-:Отображение в профиле\nGET /api/v1/me/certificates;
-:Загрузка PDF\nGET /api/v1/me/certificates/{id}/download;
+|Мобильный клиент|
+:Сервер генерирует PDF-сертификат;
+:Отображение сертификата в профиле;
+:Пользователь скачивает PDF\nGET /api/v1/me/certificates/{id}/download;
 
 stop
 @enduml
@@ -66,263 +83,275 @@ stop
 
 ==============================================================
 Рис. 2. IDEF0 контекстная диаграмма процесса прохождения онлайн курса
+(Один прямоугольник A0 со стрелками: входы слева, выходы справа,
+управление сверху, механизмы снизу — как у друга рис.2)
 ==============================================================
 
 @startuml
 skinparam backgroundColor white
-skinparam defaultFontName "Times New Roman"
 skinparam defaultFontSize 11
-skinparam rectangleBorderColor #2E75B6
-skinparam rectangleBackgroundColor #DEEBF7
-
-' Управление (сверху)
-note as N1
-  **Управление:**
-  Структура каталога курсов
-  Учебный контент (текст, видео)
-  Тестовые задания
-  Шаблон сертификата
-end note
-
-' Центральный процесс
-rectangle "**A0**\nПрохождение онлайн курса\nв мобильном приложении\nEduFlow" as A0
 
 ' Входы (слева)
-note left of A0
-  **Входы:**
-  Учётные данные
-  пользователя
-  (email, пароль)
-end note
+rectangle "Учётные данные\nпользователя\n(email, пароль)" as I1
+rectangle "Запросы\nпользователя\n(выбор курса,\nответы на тесты)" as I2
+
+' Центральный процесс
+rectangle "  **A0**\n\n  Прохождение онлайн курса\n  в мобильном приложении\n  EduFlow  " as A0 #DEEBF7
 
 ' Выходы (справа)
-note right of A0
-  **Выходы:**
-  Прогресс прохождения
-  Результаты тестов
-  Сертификат (PDF)
-end note
+rectangle "Прогресс\nпрохождения\n(% завершения)" as O1
+rectangle "Результаты\nтестов\n(баллы)" as O2
+rectangle "Сертификат\nо прохождении\n(PDF)" as O3
+
+' Управление (сверху)
+rectangle "Структура каталога\nкурсов и категорий" as C1
+rectangle "Учебный контент\n(текст, видео,\nизображения)" as C2
+rectangle "Тестовые задания\n(вопросы и\nэталонные ответы)" as C3
+rectangle "Шаблон\nсертификата" as C4
 
 ' Механизмы (снизу)
-note as N2
-  **Механизмы:**
-  Android-устройство (Kotlin, Jetpack Compose)
-  REST API сервер (Spring Boot 3)
-  СУБД PostgreSQL 16 + Redis 7
-end note
+rectangle "Android-устройство\n(Kotlin, Jetpack Compose,\nHilt, Retrofit)" as M1
+rectangle "REST API сервер\n(Spring Boot 3,\nJava 21)" as M2
+rectangle "СУБД\nPostgreSQL 16\n+ Redis 7" as M3
 
-N1 .. A0
-A0 .. N2
+' Связи
+I1 -right-> A0
+I2 -right-> A0
+
+A0 -right-> O1
+A0 -right-> O2
+A0 -right-> O3
+
+C1 -down-> A0
+C2 -down-> A0
+C3 -down-> A0
+C4 -down-> A0
+
+M1 -up-> A0
+M2 -up-> A0
+M3 -up-> A0
 @enduml
 
 
 ==============================================================
 Рис. 3. IDEF0 декомпозиция первого уровня
+(5 подпроцессов A1-A5 со связями — как у друга рис.3)
 ==============================================================
 
 @startuml
 skinparam backgroundColor white
-skinparam defaultFontName "Times New Roman"
-skinparam defaultFontSize 11
-skinparam rectangleBorderColor #2E75B6
 skinparam rectangleBackgroundColor #DEEBF7
+skinparam rectangleBorderColor #2E75B6
 
-rectangle "**A1**\nРегистрация и\nавторизация" as A1
-rectangle "**A2**\nПросмотр каталога\nкурсов" as A2
-rectangle "**A3**\nПрохождение\nуроков курса" as A3
-rectangle "**A4**\nВыполнение\nпроверочных тестов" as A4
-rectangle "**A5**\nВыдача\nсертификата" as A5
+rectangle "**A1**\nРегистрация\nи авторизация\nпользователя" as A1
+rectangle "**A2**\nПросмотр каталога\nкурсов и запись\nна выбранный курс" as A2
+rectangle "**A3**\nПоследовательное\nпрохождение\nуроков курса" as A3
+rectangle "**A4**\nВыполнение\nпроверочных\nтестов" as A4
+rectangle "**A5**\nВыдача\nсертификата\nо прохождении" as A5
 
-A1 -right-> A2 : JWT-токен
-A2 -right-> A3 : ID выбранного курса
-A3 -right-> A4 : Контент урока изучен
-A4 -down-> A5 : Все уроки пройдены
-A3 <.. A4 : Повторное\nпрохождение\n(цикл)
+A1 -right-> A2 : "JWT-токен\n(access + refresh)"
+A2 -right-> A3 : "ID курса,\nсписок модулей\nи уроков"
+A3 -right-> A4 : "Контент урока\nизучен,\nтест доступен"
+A4 -down-> A5 : "Все уроки\nпройдены\n(прогресс 100%)"
 
-note top of A1
-  Вход: email, пароль
-  Управление: правила валидации
-end note
+A3 <-[dashed]- A4 : "Повторное\nпрохождение\n(цикл A3↔A4)"
 
-note top of A3
-  Управление: структура модулей,
-  учебный контент, видеоматериалы
-end note
-
-note bottom of A5
-  Выход: PDF-сертификат
-  с уникальным номером
-end note
+note top of A1 : "Вход: email, пароль\nУправление: правила валидации\nМеханизм: AuthApi, TokenStore"
+note top of A3 : "Управление: учебный контент\n(текст, видео, изображения)\nМеханизм: LearningRepository"
+note bottom of A5 : "Выход: PDF-сертификат\nс уникальным номером\nCERT-YYYY-XXXXXX"
 @enduml
 
 
 ==============================================================
 Рис. 4. IDEF0 декомпозиция второго уровня (процесс A3 — Прохождение уроков)
+(Детализация A3 на 6 подпроцессов — как у друга рис.4)
 ==============================================================
 
 @startuml
 skinparam backgroundColor white
-skinparam defaultFontName "Times New Roman"
-skinparam defaultFontSize 11
-skinparam rectangleBorderColor #BF9000
 skinparam rectangleBackgroundColor #FFF2CC
+skinparam rectangleBorderColor #BF9000
 
-rectangle "**A3.1**\nЗапись\nна курс" as A31
-rectangle "**A3.2**\nЗагрузка контента\nурока с сервера" as A32
-rectangle "**A3.3**\nПросмотр\nматериала\n(текст + видео)" as A33
-rectangle "**A3.4**\nОтметка\n«Урок пройден»" as A34
-rectangle "**A3.5**\nСохранение\nпрогресса" as A35
-rectangle "**A3.6**\nПереход к\nследующему уроку" as A36
+rectangle "**A3.1**\nЗапись на курс\n(POST /courses/{id}/enroll)" as A31
+rectangle "**A3.2**\nЗагрузка контента\nурока с сервера\n(GET /lessons/{id})" as A32
+rectangle "**A3.3**\nПросмотр материала:\nвидео (ExoPlayer)\n+ текст (Markdown)" as A33
+rectangle "**A3.4**\nОтметка урока\nкак пройденного\n(POST /lessons/{id}/complete)" as A34
+rectangle "**A3.5**\nСохранение прогресса\nв таблице\nlesson_progress" as A35
+rectangle "**A3.6**\nПереход к\nследующему уроку\nпо position" as A36
 
-A31 -right-> A32 : Курс доступен
-A32 -right-> A33 : Контент получен
-A33 -right-> A34 : Материал изучен
-A34 -down-> A35 : Статус обновлён
-A35 -right-> A36 : Прогресс сохранён
-A36 -up-> A32 : Следующий урок
+A31 -right-> A32 : "Курс доступен,\nсписок уроков\nзагружен"
+A32 -right-> A33 : "Контент получен:\nvideo_url,\ncontent_md, quiz"
+A33 -down-> A34 : "Материал\nизучен"
+A34 -left-> A35 : "Статус\n'completed'"
+A35 -down-> A36 : "Прогресс\nсохранён"
+A36 -up-> A32 : "Следующий урок\n(position + 1)"
 
-note top of A31
-  Вход: ID курса
-  POST /courses/{id}/enroll
-end note
-
-note bottom of A36
-  Выход: если все уроки
-  пройдены → перейти к A5
-end note
+note right of A36 : "Если все уроки\nпройдены → выход\nк процессу A5\n(выдача сертификата)"
 @enduml
 
 
 ==============================================================
 Рис. 5. DFD-диаграмма первого уровня
+(Внешние сущности, процессы, хранилища, потоки данных — как у друга рис.5)
 ==============================================================
 
 @startuml
 skinparam backgroundColor white
-skinparam defaultFontName "Times New Roman"
-skinparam defaultFontSize 11
+skinparam usecaseBackgroundColor #DEEBF7
+skinparam usecaseBorderColor #2E75B6
+skinparam databaseBackgroundColor #FFF2CC
+skinparam databaseBorderColor #BF9000
 
-' Внешние сущности
-actor "Учащийся" as user
-actor "Преподаватель\n(админ-панель)" as teacher
+actor "Учащийся\n(мобильное\nприложение)" as user
+actor "Преподаватель\n(серверная\nадмин-панель)" as teacher
 
-' Процессы
-usecase "**1**\nАутентификация" as P1
-usecase "**2**\nКаталог курсов" as P2
-usecase "**3**\nПрохождение урока" as P3
-usecase "**4**\nТестирование" as P4
-usecase "**5**\nУчёт прогресса" as P5
-usecase "**6**\nВыдача сертификата" as P6
+usecase "  **1**\n  Аутентификация  " as P1
+usecase "  **2**\n  Каталог курсов  " as P2
+usecase "  **3**\n  Прохождение урока  " as P3
+usecase "  **4**\n  Тестирование  " as P4
+usecase "  **5**\n  Учёт прогресса  " as P5
+usecase "  **6**\n  Выдача сертификата  " as P6
 
-' Хранилища данных
-database "D1 users" as D1
-database "D2 courses,\nmodules, lessons" as D2
-database "D3 lesson_progress" as D3
-database "D4 certificates" as D4
+database "D1\nusers\n(учётные записи)" as D1
+database "D2\ncourses, modules,\nlessons, quiz" as D2
+database "D3\nlesson_progress\n(прогресс)" as D3
+database "D4\ncertificates\n(сертификаты)" as D4
 
-' Потоки данных
-user --> P1 : email/пароль
-P1 --> user : JWT-токен
-user --> P2 : запрос каталога
-user --> P3 : открыть урок
-user --> P4 : ответы на тест
+user -right-> P1 : "email, пароль"
+P1 -left-> user : "JWT-токен"
+user -right-> P2 : "запрос каталога"
+P2 -left-> user : "список курсов"
+user -right-> P3 : "открыть урок"
+P3 -left-> user : "контент урока"
+user -right-> P4 : "ответы на тест"
+P4 -left-> user : "результат (баллы)"
+P6 -left-> user : "PDF-сертификат"
 
-teacher --> P2 : наполнение каталога
+teacher -right-> P2 : "наполнение\nкаталога"
 
-P1 --> D1 : проверка/создание
-P2 --> D2 : запрос курсов
-P3 --> D2 : запрос контента урока
-P3 --> P5 : отметка прохождения
-P4 --> P5 : результат теста
-P5 --> D3 : сохранение прогресса
-P5 --> P6 : 100% прогресс
-P6 --> D4 : создание сертификата
-P6 --> user : PDF-сертификат
+P1 -down-> D1 : "проверка/создание\nпользователя"
+P2 -down-> D2 : "чтение курсов,\nмодулей, уроков"
+P3 -down-> D2 : "чтение контента\nурока"
+P3 -right-> P5 : "урок пройден"
+P4 -right-> P5 : "тест сдан"
+P5 -down-> D3 : "запись прогресса"
+P5 -right-> P6 : "прогресс = 100%"
+P6 -down-> D4 : "создание\nсертификата"
 @enduml
 
 
 ==============================================================
-Рис. 6. Диаграмма классов мобильного клиента
+Рис. 6. Диаграмма классов программной системы
+(Классы с атрибутами и методами + связи — как у друга рис.6)
 ==============================================================
 
 @startuml
 skinparam backgroundColor white
-skinparam defaultFontName "Times New Roman"
-skinparam defaultFontSize 10
 skinparam classBackgroundColor #DEEBF7
 skinparam classBorderColor #2E75B6
+skinparam packageBackgroundColor #F8F8F8
 
-package "UI Layer (Jetpack Compose)" {
-  class LoginScreen
-  class CatalogScreen
-  class CourseDetailsScreen
-  class LessonScreen
-  class ProfileScreen
+package "UI Layer (Jetpack Compose Screens)" {
+  class LoginScreen << @Composable >>
+  class CatalogScreen << @Composable >>
+  class CourseDetailsScreen << @Composable >>
+  class LessonScreen << @Composable >>
+  class MyCoursesScreen << @Composable >>
+  class ProfileScreen << @Composable >>
 }
 
-package "ViewModel Layer" #FFF2CC {
+package "ViewModel Layer (androidx.lifecycle)" #FFF2CC {
   class LoginViewModel {
     - authRepo: AuthRepository
-    + submit(email, password)
+    - _state: MutableStateFlow<LoginUiState>
     + state: StateFlow<LoginUiState>
+    + submit(email: String, password: String)
   }
   class CatalogViewModel {
     - catalogRepo: CatalogRepository
-    + load()
-    + filter(categoryId)
+    - _state: MutableStateFlow<CatalogUiState>
     + state: StateFlow<CatalogUiState>
+    + load()
+    + onCategorySelected(id: Long?)
+    + onQueryChanged(q: String)
   }
   class LessonViewModel {
     - learningRepo: LearningRepository
-    + load(lessonId)
-    + complete()
-    + submitQuiz(answers)
+    - _state: MutableStateFlow<LessonUiState>
     + state: StateFlow<LessonUiState>
+    + load(lessonId: Long)
+    + complete()
+    + submitQuiz(answers: Map<Long, Int>)
   }
   class ProfileViewModel {
     - certRepo: CertificateRepository
+    - meRepo: MeRepository
     + loadProfile()
-    + downloadPdf(certId)
+    + downloadPdf(certId: Long)
   }
 }
 
 package "Data Layer (Repository)" #E2EFDA {
   interface AuthRepository {
-    + login(email, pwd): ApiResult
-    + register(email, pwd, name): ApiResult
+    + login(email, pwd): Flow<ApiResult<AuthUser>>
+    + register(email, pwd, name): Flow<ApiResult<AuthUser>>
     + logout()
-    + refresh(): ApiResult
+    + currentUser: Flow<AuthUser?>
   }
   interface CatalogRepository {
-    + categories(): List<Category>
-    + courses(filter): List<CourseSummary>
-    + courseById(id): CourseDetails
+    + categories(): ApiResult<List<Category>>
+    + courses(categoryId, level, query): ApiResult<List<CourseSummary>>
+    + courseById(id): ApiResult<CourseDetails>
   }
   interface LearningRepository {
-    + enroll(courseId)
-    + lesson(id): LessonContent
-    + complete(lessonId)
-    + submitQuiz(lessonId, answers): QuizResult
-    + myCourses(): List<MyCourse>
+    + enroll(courseId): ApiResult<Unit>
+    + lesson(id): ApiResult<LessonContent>
+    + completeLesson(id): ApiResult<Unit>
+    + submitQuiz(id, answers): ApiResult<QuizResult>
+    + myCourses(): ApiResult<List<MyCourse>>
   }
   interface CertificateRepository {
-    + listMine(): List<Certificate>
-    + downloadPdf(id): ByteArray
+    + listMine(): ApiResult<List<Certificate>>
+    + downloadPdf(id): ApiResult<ByteArray>
   }
 }
 
-package "Network Layer" #FCE4D6 {
-  interface EduFlowApi <<Retrofit>>
-  interface AuthApi <<Retrofit>>
-  class EncryptedTokenStore
-  class AuthInterceptor
-  class TokenAuthenticator
+package "Network Layer (Retrofit + OkHttp)" #FCE4D6 {
+  interface EduFlowApi << @GET, @POST >> {
+    + categories(): CategoryListResponse
+    + courses(category, level, q): CourseListResponse
+    + courseById(id): CourseDetailsDto
+    + enroll(id): EnrollmentDto
+    + lesson(id): LessonContentDto
+    + completeLesson(id): LessonProgressDto
+    + submitQuiz(id, body): QuizResultDto
+    + myCourses(): MyCoursesResponse
+    + myCertificates(): CertificateListResponse
+  }
+  interface AuthApi << @POST >> {
+    + login(body): AuthResponse
+    + register(body): AuthResponse
+    + refresh(body): TokensDto
+    + logout(body)
+  }
+  class EncryptedTokenStore {
+    + save(user, tokens)
+    + access(): Flow<String?>
+    + refresh(): Flow<String?>
+    + clear()
+  }
+  class AuthInterceptor << Interceptor >> {
+    + intercept(chain): Response
+  }
+  class TokenAuthenticator << Authenticator >> {
+    + authenticate(route, response): Request?
+  }
 }
 
-LoginScreen --> LoginViewModel
-CatalogScreen --> CatalogViewModel
-LessonScreen --> LessonViewModel
-ProfileScreen --> ProfileViewModel
+LoginScreen ..> LoginViewModel
+CatalogScreen ..> CatalogViewModel
+LessonScreen ..> LessonViewModel
+ProfileScreen ..> ProfileViewModel
 
 LoginViewModel --> AuthRepository
 CatalogViewModel --> CatalogRepository
@@ -334,43 +363,49 @@ CatalogRepository --> EduFlowApi
 LearningRepository --> EduFlowApi
 CertificateRepository --> EduFlowApi
 
-AuthInterceptor --> EncryptedTokenStore
-TokenAuthenticator --> AuthApi
+AuthInterceptor --> EncryptedTokenStore : "читает access-токен"
+TokenAuthenticator --> AuthApi : "POST /auth/refresh"
+TokenAuthenticator --> EncryptedTokenStore : "обновляет токены"
 @enduml
 
 
 ==============================================================
 Рис. 7. Диаграмма вариантов использования системы
+(Акторы + use cases в системной границе — как у друга рис.7)
 ==============================================================
 
 @startuml
 skinparam backgroundColor white
-skinparam defaultFontName "Times New Roman"
-skinparam defaultFontSize 11
+skinparam usecaseBackgroundColor #FFF2CC
+skinparam usecaseBorderColor #BF9000
 left to right direction
 
 actor "Учащийся" as student
-actor "Преподаватель\n(админ-панель)" as teacher
-actor "REST API\nсервер" as server
+actor "Преподаватель\n(серверная\nадмин-панель)" as teacher
 
 rectangle "Мобильное приложение EduFlow" {
   usecase "Зарегистрироваться" as UC1
   usecase "Авторизоваться" as UC2
   usecase "Просмотреть каталог курсов" as UC3
-  usecase "Фильтровать по категории" as UC4
-  usecase "Открыть карточку курса" as UC5
-  usecase "Записаться на курс" as UC6
-  usecase "Открыть урок" as UC7
-  usecase "Просмотреть видеолекцию" as UC8
-  usecase "Пройти проверочный тест" as UC9
-  usecase "Отметить урок пройденным" as UC10
-  usecase "Просмотреть «Мои курсы»" as UC11
-  usecase "Просмотреть профиль" as UC12
-  usecase "Получить сертификат" as UC13
-  usecase "Скачать PDF сертификата" as UC14
-  usecase "Выйти из аккаунта" as UC15
-  usecase "Управлять каталогом курсов" as UC16
-  usecase "Управлять пользователями" as UC17
+  usecase "Фильтровать курсы\nпо категории" as UC4
+  usecase "Поиск курсов\nпо ключевому слову" as UC5
+  usecase "Открыть карточку курса" as UC6
+  usecase "Записаться на курс" as UC7
+  usecase "Открыть урок" as UC8
+  usecase "Просмотреть видеолекцию" as UC9
+  usecase "Пройти проверочный тест" as UC10
+  usecase "Отметить урок пройденным" as UC11
+  usecase "Просмотреть «Мои курсы»" as UC12
+  usecase "Просмотреть профиль" as UC13
+  usecase "Получить сертификат" as UC14
+  usecase "Скачать PDF сертификата" as UC15
+  usecase "Выйти из аккаунта" as UC16
+}
+
+rectangle "Серверная админ-панель" {
+  usecase "Управлять каталогом курсов" as UC17
+  usecase "Создавать уроки и тесты" as UC18
+  usecase "Управлять учётными\nзаписями" as UC19
 }
 
 student --> UC1
@@ -388,48 +423,54 @@ student --> UC12
 student --> UC13
 student --> UC14
 student --> UC15
+student --> UC16
 
-teacher --> UC16
 teacher --> UC17
+teacher --> UC18
+teacher --> UC19
 
-UC1 --> server
-UC2 --> server
-UC6 --> server
-UC9 --> server
-UC13 --> server
-UC14 --> server
-UC16 --> server
+UC4 .> UC3 : <<extend>>
+UC5 .> UC3 : <<extend>>
+UC9 .> UC8 : <<include>>
+UC10 .> UC8 : <<include>>
+UC15 .> UC14 : <<extend>>
 @enduml
 
 
 ==============================================================
 Рис. 8. Экран авторизации мобильного приложения
-(Для этого рисунка лучше сделать скриншот реального приложения
-или нарисовать макет в Figma. Но если нужен PlantUML:)
+(Скриншот или wireframe экрана входа — как у друга рис.8)
+ПРИМЕЧАНИЕ: Лучше вставить реальный скриншот из приложения.
+Если нет возможности — вот wireframe:
 ==============================================================
 
 @startsalt
-skinparam backgroundColor white
 {+
-  {* EduFlow | }
+  {* EduFlow                     }
   ---
   .
   .
-  {^" Вход в EduFlow "
+  .
+  {^"     Вход в EduFlow     "
     .
     {
       Email
-      "user@example.com       "
-    }
-    {
-      Пароль
-      "********               "
+      "user@example.com            "
     }
     .
-    [        Войти        ]
+    {
+      Пароль
+      "********                    "
+    }
+    .
+    .
+    [          Войти          ]
+    .
     .
     <color:blue>У меня ещё нет аккаунта
   }
+  .
+  .
   .
   .
 }
@@ -437,37 +478,34 @@ skinparam backgroundColor white
 
 
 ==============================================================
-Рис. 9. Экран каталога курсов мобильного приложения
-(Аналогично — лучше скриншот, но вот PlantUML wireframe:)
+Рис. 9. Главный экран приложения: каталог курсов
+(Скриншот или wireframe главного экрана — как у друга рис.9)
+ПРИМЕЧАНИЕ: Лучше вставить реальный скриншот из приложения.
+Если нет возможности — вот wireframe:
 ==============================================================
 
 @startsalt
-skinparam backgroundColor white
 {+
-  {* EduFlow | Каталог }
+  {* EduFlow         | Каталог  }
   ---
-  " Поиск курсов...                    "
+  {SI
+    Поиск курсов...
+  }
   ---
   { [Все] | [**IT**] | [Дизайн] | [Бизнес] | [Языки] }
   ---
-  {
-    {
-      **Kotlin для Android**
-      Иван Петров
-      16 ч | Начальный
-      ---
-      **UI/UX-дизайн**
-      Анна Смирнова
-      20 ч | Средний
-      ---
-      **Управление проектами**
-      Олег Иванов
-      12 ч | Начальный
-      ---
-      **Английский A2-B1**
-      Maria Lee
-      30 ч | Средний
-    }
+  {T
+    + **Kotlin для Android**          | 16 ч | Начальный
+    + Иван Петров
+    --
+    + **UI/UX-дизайн**                | 20 ч | Средний
+    + Анна Смирнова
+    --
+    + **Управление проектами**         | 12 ч | Начальный
+    + Олег Иванов
+    --
+    + **Английский A2-B1**            | 30 ч | Средний
+    + Maria Lee
   }
   ---
   { [Каталог] | [Мои курсы] | [Профиль] }
